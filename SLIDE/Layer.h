@@ -17,7 +17,8 @@ private:
 	int * _randNode;
 	float* _normalizationConstants;
     int*_inputIDs; //needed for SOFTMAX
-    int _K, _L, _RangeRow, _previousLayerNumOfNodes, _batchsize;
+    int _K, _L, _RangeRow, _previousLayerNumOfNodes, _batchsize, _mode;
+	
 
 
 public:

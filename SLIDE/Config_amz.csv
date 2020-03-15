@@ -11,17 +11,16 @@ totRecords = 490449
 totRecordsTest = 153025
 
 Lr=0.0001
-Epoch=200
-Stepsize=100
+Epoch=20
+Stepsize=500
 
-sizesOfLayers=128,670091
+sizesOfLayers=256,670091
 numLayer=2
 
-trainData=/beidi/NN/data/amazon_shuf_train
-testData=/beidi/NN/data/amazon_shuf_test
+trainData=/home/bc20/NN/data/amazon_shuf_train
+testData=/home/bc20/NN/data/amazon_shuf_test
 
-weight=
-savedweight=
+weight=../saved_weights/amz.npz
+savedweight=../saved_weights/amz2.npz
 
-logFile=
-logFile=
+logFile=../logs/log_amazon_K-6_L-50_mode5_Sprs0.005_B128_lr0.0001_h256_new.txt

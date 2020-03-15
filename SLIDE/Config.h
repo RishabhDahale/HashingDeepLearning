@@ -4,7 +4,7 @@
 #define EPS 0.00000001
 
 //1: wta; 2: Densified wta; 3: topk minhash; 4: simhash
-#define HashFunction 2
+#define HashFunction 4
 #define BUCKETSIZE 128
 //for minhash
 #define TOPK 30
@@ -21,4 +21,4 @@
 
 #define LOADWEIGHT 0
 
-#define MAPLEN 325056
+#define MAPLEN 501070

@@ -124,6 +124,10 @@ int Network::predictClass(int **inputIndices, float **inputValues, int *length, 
 
 int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths, int **labels, int *labelsize, int iter, bool rehash, bool rebuild) {
 
+   // if (iter<1000*_batchsize){
+   // 	rehash=false;
+//	rebuild=false;
+ //   }
 
     float logloss = 0.0;
     int lowconf = 0;
@@ -143,8 +147,8 @@ int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths,
 //        tmplr *= pow(0.9, iter/10.0);
     }
 
-//    omp_set_num_threads(44);
-//    int id  = omp_get_max_threads();
+   // omp_set_num_threads(44);
+   // int id  = omp_get_max_threads();
     # pragma omp parallel for
     for (int i = 0; i < _currentBatchSize; i++) {
         int **activenodesperlayer = new int *[_numberOfLayers + 1]();
@@ -154,6 +158,8 @@ int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths,
         activenodesperlayer[0] = inputIndices[i];
         activeValuesperlayer[0] = inputValues[i];
         sizes[0] = lengths[i];
+
+
         // cout<<"start query"<<endl;
         int in;
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -168,6 +174,7 @@ int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths,
 
 
         //Now backpropagate.
+
 
         for (int j = _numberOfLayers - 1; j >= 0; j--) {
             for (int k = 0; k < sizes[j + 1]; k++) {
@@ -188,17 +195,21 @@ int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths,
             }
 
         }
-
+        
 
         //Free memory to avoid leaks
         delete[] sizes;
         for (int j = 1; j < _numberOfLayers + 1; j++) {
             delete[] activenodesperlayer[j];
             delete[] activeValuesperlayer[j];
+
         }
         delete[] activenodesperlayer;
         delete[] activeValuesperlayer;
+
+
     }
+
 
 
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -274,7 +285,6 @@ int Network::ProcessInput(int **inputIndices, float **inputValues, int *lengths,
     auto t2 = std::chrono::high_resolution_clock::now();
     int timeDiffInMiliseconds = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 //            std::cout << "Layer " <<" takes" << 1.0 * timeDiffInMiliseconds << std::endl;
-
 
     if (DEBUG&rehash) {
 

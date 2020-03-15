@@ -6,6 +6,7 @@
 #include <climits>
 #include "Config.h"
 #include <bitset>
+#include <math.h>
 #include <fstream>
 
 using namespace std;
@@ -19,6 +20,7 @@ Layer::Layer(int noOfNodes, int previousLayerNumOfNodes, int layerID, NodeType t
     _noOfActive = floor(_noOfNodes * Sparsity);
     _K = K;
     _L = L;
+    _mode = Mode;
     _batchsize = batchsize;
     _RangeRow = RangePow;
     _previousLayerNumOfNodes = previousLayerNumOfNodes;
@@ -180,6 +182,25 @@ float innerproduct(int* index1, float* value1, int len1, float* value2){
     return total;
 }
 
+float innerproduct(float* value1, float* value2, int len1){
+    float total = 0;
+    for (int i=0; i<len1; i++){
+        total+=value1[i]*value2[i];
+    }
+    return total;
+}
+
+float cosine(float* value1, float* value2, int len1){
+    float total = 0;
+    float div1 = 0;
+    float div2 = 0;
+    for (int i=0; i<len1; i++){
+        total+=value1[i]*value2[i];
+	div1+=value1[i]*value1[i];
+	div2+=value2[i]*value2[i];
+    }
+    return total/sqrt(div1*div2);
+}
 
 float collision(int* hashes, int* table_hashes, int k, int l){
     int cp = 0;
@@ -200,6 +221,15 @@ float collision(int* hashes, int* table_hashes, int k, int l){
 
 int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float** activeValuesperlayer, int* lengths, int layerIndex, int inputID, int* label, int labelsize, float Sparsity, int iter)
 {
+    //Changing MODE based on iterations
+    if (iter==0 ){
+        _mode=5;
+    }
+
+    if (iter==(1000*_batchsize)){
+       _mode=5;
+    }
+
     //LSH QueryLogic
 
     //Beidi. Query out all the candidate nodes
@@ -215,9 +245,103 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
         }
     }
     else {
+        if (_mode==5) {
+            std::map<int, size_t> counts;
+            int *hashes;
+            int *hashIndices;
+            int **actives;
+            int la = rand() % labelsize;
+            // for (int la=0; la<labelsize; la++){
+                if (HashFunction == 1) {
+                    hashes = _wtaHasher->getHash(activeValuesperlayer[layerIndex]);
+                } else if (HashFunction == 2) {
+                    hashes = _dwtaHasher->getHash(activenodesperlayer[layerIndex], _weights+_previousLayerNumOfNodes*label[la],
+                                                  lengths[layerIndex]);
+                } else if (HashFunction == 4) {
+                    hashes = _srp->getHashSparse(activenodesperlayer[layerIndex], _weights+_previousLayerNumOfNodes*label[la], lengths[layerIndex]);
+                }
+                hashIndices = _hashTables->hashesToIndex(hashes);
+                actives = _hashTables->retrieveRaw(hashIndices);
+
+                for (int i = 0; i < _L; i++) {
+                    if (actives[i] == NULL) {
+                        continue;
+                    } else {
+                        for (int j = 0; j < BUCKETSIZE; j++) {
+                            int tempID = actives[i][j] - 1;
+                            if (tempID >= 0) {
+                                counts[tempID] += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+            // }
+
+            // Get candidates from hashtable
 
 
-        if (Mode==1) {
+            // Make sure that the true label node is in candidates
+            if (_type == NodeType::Softmax) {
+                if (labelsize > 0) {
+                    for (int i=0; i<labelsize ;i++){
+                        counts[label[i]] = _L*labelsize;
+                    }
+                }
+            }
+
+
+
+
+            in = counts.size();
+
+            if (counts.size()<1500){
+
+                srand(time(NULL));
+                int start = rand() % _noOfNodes;
+                for (int i = start; i < _noOfNodes; i++) {
+                    if (counts.size() >= 1000) {
+                        break;
+                    }
+                    if (counts.count(_randNode[i]) == 0) {
+                        counts[_randNode[i]] = 0;
+                    }
+                }
+
+
+                if (counts.size() < 1000) {
+                    for (int i = 0; i < _noOfNodes; i++) {
+                        if (counts.size() >= 1000) {
+                            break;
+                        }
+                        if (counts.count(_randNode[i]) == 0) {
+                            counts[_randNode[i]] = 0;
+                        }
+                    }
+                }
+            }
+
+            len = counts.size();
+            lengths[layerIndex + 1] = len;
+            activenodesperlayer[layerIndex + 1] = new int[len];
+
+            int i=0;
+            for (auto &&x : counts) {
+                activenodesperlayer[layerIndex + 1][i] = x.first;
+                i++;
+            }
+
+
+
+
+            delete[] hashes;
+            delete[] hashIndices;
+            delete[] actives;
+
+            }
+
+        if (_mode==1) {
 
 
             int *hashes;
@@ -331,7 +455,7 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
             delete[] actives;
 
         }
-        if (Mode==4) {
+        if (_mode==4) {
             int *hashes;
             if (HashFunction == 1) {
                 hashes = _wtaHasher->getHash(activeValuesperlayer[layerIndex]);
@@ -420,10 +544,17 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
             delete[] actives;
 
         }
-        else if (Mode == 2 & _type== NodeType::Softmax) {
-            len = floor(_noOfNodes * Sparsity);
-            lengths[layerIndex + 1] = len;
+        else if (_mode == 2 & _type== NodeType::Softmax) {
+           
+	    len = floor(_noOfNodes * Sparsity);
+            if (len<labelsize){
+	    	len = labelsize*2;
+	    }
+	   	 
+	    lengths[layerIndex + 1] = len;
             activenodesperlayer[layerIndex + 1] = new int[len];
+
+	    
 
             auto t1 = std::chrono::high_resolution_clock::now();
             bitset <MAPLEN> bs;
@@ -438,14 +569,19 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
                 }
             }
 
+
             while(tmpsize<len){
                 int v = rand() % _noOfNodes;
+
+
                 if(bs[v]==0) {
                     activenodesperlayer[layerIndex + 1][tmpsize] = v;
                     bs[v]=1;
                     tmpsize++;
                 }
             }
+
+	    in = len;
 
 
 
@@ -455,7 +591,7 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
 
         }
 
-        else if (Mode==3 & _type== NodeType::Softmax){
+        else if (_mode==3 & _type== NodeType::Softmax){
 
             len = floor(_noOfNodes * Sparsity);
             lengths[layerIndex + 1] = len;
@@ -488,15 +624,16 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
     }
 
 
-
     //***********************************
 //    auto t1 = std::chrono::high_resolution_clock::now();
     activeValuesperlayer[layerIndex + 1] = new float[len]; //assuming its not initialized else memory leak;
+
     float maxValue = 0;
     if (_type == NodeType::Softmax)
         _normalizationConstants[inputID] = 0;
-
     int filtered = 0;
+    float sum = 0;
+    float cos = 0;
     for (int i = 0; i < len; i++)
     {
         activeValuesperlayer[layerIndex + 1][i] = _Nodes[activenodesperlayer[layerIndex + 1][i]]->getActivation(activenodesperlayer[layerIndex], activeValuesperlayer[layerIndex], lengths[layerIndex], inputID);
@@ -508,6 +645,19 @@ int Layer::queryActiveNodeandComputeActivations(int** activenodesperlayer, float
                 maxValue = activeValuesperlayer[layerIndex + 1][i];
             }
         }
+	if (_type == NodeType::Softmax & (int)(iter/_batchsize) % 1000==0 & Sparsity<1){
+            for (int j=0; j<labelsize;j++){
+	//cout<<sum<<" "<<_Nodes[activenodesperlayer[layerIndex + 1][i]]->_weights[0] <<" "<<_Nodes[3257]->_weights[0]<<" "<<_previousLayerNumOfNodes <<endl;
+                sum+=innerproduct(_Nodes[activenodesperlayer[layerIndex + 1][i]]->_weights, _Nodes[label[j]]->_weights, _previousLayerNumOfNodes);
+            	cos+=cosine(_Nodes[activenodesperlayer[layerIndex + 1][i]]->_weights, _Nodes[label[j]]->_weights, _previousLayerNumOfNodes);
+		//cout<<sum<<endl;
+	    }
+        }
+    }
+
+    if (_type == NodeType::Softmax & (int)(iter/_batchsize) % 1000==0 & Sparsity<1){
+        ofstream outputFile("../logs/inner_product_Wiki500_K-15_L-50_mode5_Sprs0.1_B128_lr0.0001_h256_test4.txt",  std::ios_base::app);
+        outputFile << (int)iter/_batchsize<<" " <<inputID << " " << sum/len/labelsize <<" "<<cos/len/labelsize<< endl;
     }
 
     if(_type == NodeType::Softmax) {

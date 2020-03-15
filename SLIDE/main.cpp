@@ -303,7 +303,7 @@ void EvalDataSVM(int numBatchesTest,  Network* _mynet, int iter){
 
         auto correctPredict = _mynet->predictClass(records, values, sizes, labels, labelsize);
         totCorrect += correctPredict;
-        std::cout <<" iter "<< i<<" "<< totCorrect*1.0/(Batchsize*(i+1))<<std::endl;
+        std::cout <<" iter "<< i<<" "<< totCorrect*1.0/(Batchsize*(i+1))<< " Mode is " << Mode<<std::endl;
 
         delete[] sizes;
         delete[] labels;
@@ -330,7 +330,7 @@ void ReadDataSVM(int numBatches,  Network* _mynet, int epoch){
     int totalTime = 0;
     for (size_t i = 0; i < numBatches; i++) {
         if((i+epoch*numBatches)%Stepsize==0) {
-            EvalDataSVM(20, _mynet, epoch*numBatches+i);
+           EvalDataSVM(10, _mynet, epoch*numBatches+i);
         }
         int **records = new int *[Batchsize];
         float **values = new float *[Batchsize];
@@ -398,13 +398,13 @@ void ReadDataSVM(int numBatches,  Network* _mynet, int epoch){
         bool rehash = false;
         bool rebuild = false;
         if ((epoch*numBatches+i)%(Rehash/Batchsize) == (Rehash/Batchsize-1)){
-            if(Mode==1 || Mode==4) {
+            if(Mode==1 || Mode==4 || Mode==5) {
                 rehash = true;
             }
         }
 
         if ((epoch*numBatches+i)%(Rebuild/Batchsize) == (Rehash/Batchsize-1)){
-            if(Mode==1 || Mode==4) {
+            if(Mode==1 || Mode==4 || Mode==5) {
                 rebuild = true;
             }
         }
